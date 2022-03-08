@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:basic/counterLogic.dart';
+import 'package:basic/counter_logic.dart';
 
 void main() {
   runApp(MyApp());
