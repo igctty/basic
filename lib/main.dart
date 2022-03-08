@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:basic/counter_logic.dart';
+import 'package:flutter_redux/flutter_redux.dart';
+import 'package:redux/redux.dart';
+import 'package:basic/action/actions.dart';
+import 'package:basic/state/app_state.dart';
+import 'package:basic/reducer/app_state_reducer.dart';
+import 'package:basic/repository/counter_repository.dart';
+import 'package:basic/middleware/counter_middleware.dart';
+import 'package:basic/loading_widget.dart';
+
 
 void main() {
   runApp(MyApp());
@@ -14,13 +22,14 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: MyHomePage(
-          title: 'Flutter Demo Home Page',
+          title: 'Flutter Demo Home Page'
       ),
     );
   }
 }
 
 class MyHomePage extends StatelessWidget {
+  final CountRepository _repository = CountRepository();
   final String title;
   MyHomePage({required this.title});
 
@@ -28,183 +37,102 @@ class MyHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text(title),
+        title: Text(title),
       ),
       body: ListView(
         children: <Widget>[
-          //TODO: アーキ用の画面追加
           ListTile(
-            title: const Text("setStateの場合"),
-            onTap: (){},
-          ),
-          ListTile(
-            title: const Text("StreamBuilderの場合"),
-            onTap: (){
+            title: const Text("Reduxの場合"),
+            onTap: () {
               Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TopPageStreamBuilder(),
+                    builder: (context) => TopPage(_repository),
                     fullscreenDialog: true,
                   ));
             },
-          )
-        ]
+          ),
+          const Divider(),
+        ],
       ),
     );
   }
 }
 
-// class TopPage extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return _HomePage(
-//       child: Scaffold(
-//         appBar: AppBar(
-//           title: const Text('Inherited Widget Demo'),
-//         ),
-//         body: Column(
-//           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-//           children: <Widget>[
-//             _TopContent(),
-//             _MiddleContent(),
-//             _BottomContent(),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
+@immutable
+class TopPage extends StatelessWidget {
+  final CountRepository _repository;
 
-class _HomePage extends StatefulWidget {
-  _HomePage({
-    Key? key,
-    required this.child,
-  }) : super(key: key);
-  final Widget child;
+  final Store<AppState> store;
 
-  @override
-  _HomePageState createState() => _HomePageState();
-
-  static _HomePageState of(BuildContext context,{bool rebuild = true}) {
-    if (rebuild) {
-      return (context.dependOnInheritedWidgetOfExactType<_MyInheritedWidget>())!.data;
-    }
-    return (context.getElementForInheritedWidgetOfExactType<_MyInheritedWidget>()?.widget as _MyInheritedWidget).data;
-  }
-}
-
-class _HomePageState extends State<_HomePage>{
-  int counter = 0;
-
-  void _incrementCounter() async {
-    setState((){
-      counter++;
-    });
-  }
-
+  TopPage(this._repository)
+      : store = Store<AppState>(
+        appStateReducer,
+            initialState: const AppState(),
+            middleware: counterMiddleware(_repository),
+        );
   @override
   Widget build(BuildContext context) {
-    return _MyInheritedWidget(
-      data: this,
-      child: widget.child,
+    return StoreProvider(
+      store: store,
+      child: Stack(
+        children: <Widget>[
+          Scaffold(
+            appBar: AppBar(
+              title: const Text('Redux Demo'),
+            ),
+            body: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: <Widget>[
+                _TopContent(),
+                _MiddleContent(),
+                _BottomContent(),
+              ],
+            ),
+          ),
+          const LoadingWidget(),
+        ],
+      ),
     );
   }
 }
 
-class _MyInheritedWidget extends InheritedWidget {
-  _MyInheritedWidget({
-    Key? key,
-    required Widget child,
-    required this.data,
-  }) : super(key: key, child: child);
-  final _HomePageState data;
-
-  @override
-  bool updateShouldNotify(_MyInheritedWidget oldWidget){
-    return true;
-  }
-}
 
 class _TopContent extends StatelessWidget {
-  final CounterLogic counterLogic;
-  _TopContent(this.counterLogic);
-
   @override
   Widget build(BuildContext context) {
-    print("called _TopContent #build()");
-
+    print("called _TopContent#build()");
     return Center(
-      child: StreamBuilder(
-        stream: counterLogic.value,
-        builder: (context,snapshot){
-          return Text(
-            '${snapshot.data}',
-            style:Theme.of(context).textTheme.displayMedium,
-          );
-        },
-      ),
-    );
+        child: StoreConnector<AppState, int>(
+          converter: (store) => store.state.counter,
+          builder: (context, counter) {
+            return Text(
+              '$counter',
+              style: Theme.of(context).textTheme.headline4,
+            );
+          },
+        ));
   }
 }
 
 class _MiddleContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    print("called _MiddleContent #build()");
+    print("called _MiddleContent#build()");
     return const Text('I am a Widget that will not be rebuilt.');
   }
 }
 
 class _BottomContent extends StatelessWidget {
-  final CounterLogic counterLogic;
-  _BottomContent(this.counterLogic);
-
   @override
   Widget build(BuildContext context) {
-    print("called _BottomContent #build()");
+    print("called _BottomContent#build()");
     return ElevatedButton(
-        onPressed: (){
-          counterLogic.incrementCounter();
-        },
-        child: Icon(Icons.add),
+      onPressed: () {
+        var store = StoreProvider.of<AppState>(context);
+        store.dispatch(CountUpAction(store.state.counter));
+      },
+      child: const Icon(Icons.add),
     );
-  }
-}
-
-class TopPageStreamBuilder extends StatefulWidget {
-  @override
-  _TopPageState createState() => _TopPageState();
-}
-
-class _TopPageState extends State<TopPageStreamBuilder> {
-  CounterLogic? counterLogic;
-
-  @override
-  void initState() {
-    super.initState();
-    counterLogic = CounterLogic();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('StreamBuilder Sample'),
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _TopContent(counterLogic!),
-          _MiddleContent(),
-          _BottomContent(counterLogic!),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    counterLogic?.dispose();
-    super.dispose();
   }
 }
