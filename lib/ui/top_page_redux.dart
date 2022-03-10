@@ -11,15 +11,15 @@ import 'widget/loading_widget_redux.dart';
 
 @immutable
 class TopPageRedux extends StatelessWidget {
-  TopPageRedux(this._repository, {Key? key})
-      : store = Store<AppState>(
-    appStateReducer,
-    initialState: const AppState(),
-    middleware: counterMiddleware(_repository),
-  ), super(key: key);
-
-  final CountRepository _repository;
+  final CountRepository repository;
   final Store<AppState> store;
+
+  TopPageRedux(this.repository, {Key? key})
+    : store = Store<AppState>(
+              appStateReducer,
+              initialState: const AppState(),
+              middleware: counterMiddleware(repository),
+    ), super(key: key);
 
   @override
   Widget build(BuildContext context) {
